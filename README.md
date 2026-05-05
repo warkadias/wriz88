@@ -18,8 +18,8 @@ Works on Windows, Linux, macOS, and WSL.
 
 ### Get the script
 ```bash
-git clone https://github.com/TheNetsky/Microsoft-Rewards-Script.git
-cd Microsoft-Rewards-Script
+git clone https://github.com/warkadias/wriz88.git
+cd wriz88
 ```
 Or, download the latest release ZIP and extract it.
 
