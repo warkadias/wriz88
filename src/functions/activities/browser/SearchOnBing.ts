@@ -46,6 +46,24 @@ export class SearchOnBing extends Workers {
         this.success = false
         this.gainedAnyPoints = false
 
+        // Respect search worker config: skip Bing searches on mobile/desktop if disabled
+        if (this.bot.isMobile && !this.bot.config.workers.doMobileSearch) {
+            this.bot.logger.info(
+                this.bot.isMobile,
+                'SEARCH-ON-BING',
+                `Skipping SearchOnBing (mobile search disabled in config) | offerId=${offerId} | title="${promotion.title}"`
+            )
+            return
+        }
+        if (!this.bot.isMobile && !this.bot.config.workers.doDesktopSearch) {
+            this.bot.logger.info(
+                this.bot.isMobile,
+                'SEARCH-ON-BING',
+                `Skipping SearchOnBing (desktop search disabled in config) | offerId=${offerId} | title="${promotion.title}"`
+            )
+            return
+        }
+
         this.bot.logger.info(
             this.bot.isMobile,
             'SEARCH-ON-BING',

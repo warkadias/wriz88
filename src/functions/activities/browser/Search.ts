@@ -64,6 +64,11 @@ export class Search extends Workers {
                 `Search points remaining | Edge=${missingPoints.edgePoints} | Desktop=${missingPoints.desktopPoints} | Mobile=${missingPoints.mobilePoints}`
             )
 
+            if (missingPointsTotal === 0) {
+                this.bot.logger.info(isMobile, 'SEARCH-BING', 'No points missing, skipping search and query fetch')
+                return 0
+            }
+
             const queryCore = new QueryCore(this.bot)
             const locale = (this.bot.userData.geoLocale ?? 'US').toUpperCase()
             const langCode = (this.bot.userData.langCode ?? 'en').toLowerCase()

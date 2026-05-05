@@ -503,6 +503,16 @@ export class SearchManager {
 
         return await executionContext.run({ isMobile: false, accountEmail }, async () => {
             try {
+                if (!this.bot.config.workers.doDesktopSearch) {
+                    this.bot.logger.info('main', 'SEARCH-DESKTOP-PARALLEL', 'Skip: worker disabled in config')
+                    return 0
+                }
+
+                if (missingSearchPoints.desktopPoints === 0) {
+                    this.bot.logger.info('main', 'SEARCH-DESKTOP-PARALLEL', 'Skip: no points left')
+                    return 0
+                }
+
                 this.bot.logger.info(
                     'main',
                     'SEARCH-DESKTOP-PARALLEL',
