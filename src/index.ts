@@ -26,6 +26,7 @@ import { sendNtfy, flushNtfyQueue } from './logging/Ntfy'
 import type { DashboardData } from './interface/DashboardData'
 import type { AppDashboardData } from './interface/AppDashBoardData'
 import type { PanelFlyoutData } from './interface/PanelFlyoutData'
+import { writeSerpBotScoreLog } from './util/SerpBotScoreLogger'
 
 interface ExecutionContext {
     isMobile: boolean
@@ -45,6 +46,8 @@ interface AccountStats {
     duration: number
     success: boolean
     error?: string
+    serpBotScore?: string
+    serpBotScoreUpd?: string
 }
 
 const executionContext = new AsyncLocalStorage<ExecutionContext>()
@@ -371,7 +374,7 @@ export class MicrosoftRewardsBot {
 
                 this.httpcloak = new HttpCloakClient(account.proxy, { debug: this.config.debugLogs })
                 const maxMobileFlowRetries = 3
-                let result: { initialPoints: number; collectedPoints: number } | undefined
+                let result: { initialPoints: number; collectedPoints: number; serpBotScore: string; serpBotScoreUpd: string } | undefined
                 let lastFlowErrorMessage = ''
 
                 for (let attempt = 1; !result && attempt <= maxMobileFlowRetries; attempt++) {
@@ -401,6 +404,8 @@ export class MicrosoftRewardsBot {
                     const collectedPoints = result.collectedPoints ?? 0
                     const accountInitialPoints = result.initialPoints ?? 0
                     const accountFinalPoints = accountInitialPoints + collectedPoints
+                    const serpBotScore = result.serpBotScore ?? 'N/A'
+                    const serpBotScoreUpd = result.serpBotScoreUpd ?? 'N/A'
 
                     accountStats.push({
                         email: accountEmail,
@@ -408,13 +413,15 @@ export class MicrosoftRewardsBot {
                         finalPoints: accountFinalPoints,
                         collectedPoints: collectedPoints,
                         duration: parseFloat(durationSeconds),
-                        success: true
+                        success: true,
+                        serpBotScore,
+                        serpBotScoreUpd
                     })
 
                     this.logger.info(
                         'main',
                         'ACCOUNT-END',
-                        `Completed account: ${accountEmail} | Total: +${collectedPoints} | Old: ${accountInitialPoints} → New: ${accountFinalPoints} | Duration: ${durationSeconds}s`,
+                        `Completed account: ${accountEmail} | Total: +${collectedPoints} | Old: ${accountInitialPoints} → New: ${accountFinalPoints} | SerpBotScore: ${serpBotScore} | Duration: ${durationSeconds}s`,
                         'green'
                     )
                 } else {
@@ -448,6 +455,23 @@ export class MicrosoftRewardsBot {
             const totalFinalPoints = accountStats.reduce((sum, s) => sum + s.finalPoints, 0)
             const totalDurationMinutes = ((Date.now() - runStartTime) / 1000 / 60).toFixed(1)
 
+            // Write SerpBotScore daily log
+            const serpEntries = accountStats.map(s => ({
+                email: s.email,
+                collectedPoints: s.collectedPoints,
+                initialPoints: s.initialPoints,
+                finalPoints: s.finalPoints,
+                serpBotScore: s.serpBotScore ?? 'N/A',
+                serpBotScoreUpd: s.serpBotScoreUpd ?? 'N/A',
+                duration: s.duration,
+                success: s.success,
+                error: s.error
+            }))
+            if (serpEntries.length > 0) {
+                await writeSerpBotScoreLog(serpEntries)
+                this.logger.info('main', 'SERP-BOT-SCORE-LOG', `Account log saved → logs/SerpBotScore_${new Date().toISOString().slice(0, 10)}.txt`)
+            }
+
             this.logger.info(
                 'main',
                 'RUN-END',
@@ -462,7 +486,7 @@ export class MicrosoftRewardsBot {
         return accountStats
     }
 
-    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number }> {
+    async Main(account: Account): Promise<{ initialPoints: number; collectedPoints: number; serpBotScore: string; serpBotScoreUpd: string }> {
         const accountEmail = account.email
         this.logger.info('main', 'FLOW', `Starting session for ${accountEmail}`)
 
@@ -585,9 +609,25 @@ export class MicrosoftRewardsBot {
                     `Collected: +${collectedPoints} | Mobile: +${mobilePoints} | Desktop: +${desktopPoints} | ${accountEmail}`
                 )
 
+                const serpBotScore = data.userProfile?.attributes?.serpbotscore ?? 'N/A'
+                const serpBotScoreUpdRaw = data.userProfile?.attributes?.serpbotscore_upd
+                const serpBotScoreUpd = serpBotScoreUpdRaw
+                    ? new Date(serpBotScoreUpdRaw).toLocaleString('id-ID', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false
+                      })
+                    : 'N/A'
+
                 return {
                     initialPoints,
-                    collectedPoints: collectedPoints || 0
+                    collectedPoints: collectedPoints || 0,
+                    serpBotScore,
+                    serpBotScoreUpd
                 }
             })
         } finally {
