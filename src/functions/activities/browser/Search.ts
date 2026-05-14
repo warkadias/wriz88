@@ -1,7 +1,4 @@
 import type { Page } from 'patchright'
-import fs from 'fs'
-import os from 'os'
-import path from 'path'
 import type { Counters, DashboardData } from '../../../interface/DashboardData'
 import type { QueryEngine } from '../../../interface/Config'
 
@@ -12,7 +9,6 @@ export class Search extends Workers {
     private bingHome = 'https://bing.com'
     private searchPageURL = ''
     private searchCount = 0
-    private imageSearchDone = false
 
     private async gotoWithRetry(page: Page, url: string, isMobile: boolean, maxRetries = 3): Promise<void> {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -104,7 +100,7 @@ export class Search extends Workers {
             await this.gotoWithRetry(page, targetUrl, isMobile)
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
             await this.bot.browser.utils.tryDismissAllMessages(page)
-            await this.dailyImageSearch(page, isMobile)
+
 
             let stagnantLoop = 0
             const stagnantLoopMax = 10
@@ -443,63 +439,6 @@ export class Search extends Workers {
         )
 
         return await this.bot.browser.func.getSearchPoints()
-    }
-
-    private async dailyImageSearch(page: Page, isMobile: boolean) {
-        if (this.imageSearchDone) {
-            return
-        }
-
-        this.imageSearchDone = true
-
-        if (isMobile) {
-            this.bot.logger.info(isMobile, 'SEARCH-BING-IMAGE', 'Skipping image search on mobile')
-            return
-        }
-
-        const imageUrl = 'https://picsum.photos/200/300'
-        const tempFilePath = path.join(os.tmpdir(), `bing-visual-search-${Date.now()}.jpg`)
-
-        this.bot.logger.info(isMobile, 'SEARCH-BING-IMAGE', 'Starting daily image search')
-
-        try {
-            await page.evaluate(() => {
-                window.scrollTo({ left: 0, top: 0, behavior: 'auto' })
-            })
-
-            const triggerSelector = '#sb_sbi'
-            await page.locator(triggerSelector).waitFor({ state: 'visible', timeout: 10000 })
-            await this.bot.browser.utils.ghostClick(page, triggerSelector)
-            await this.bot.utils.wait(1500)
-
-            const response = await this.bot.axios.request({
-                url: imageUrl,
-                method: 'GET',
-                responseType: 'arraybuffer',
-                maxRedirects: 5
-            })
-
-            await fs.promises.writeFile(tempFilePath, Buffer.from(response.data))
-
-            const fileInputSelector = '#sb_fileinput'
-            const fileInput = page.locator(fileInputSelector)
-            await fileInput.waitFor({ state: 'attached', timeout: 10000 })
-
-            await fileInput.setInputFiles(tempFilePath)
-
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
-            await this.bot.utils.wait(2000)
-
-            this.bot.logger.info(isMobile, 'SEARCH-BING-IMAGE', 'Completed daily image search')
-        } catch (error) {
-            this.bot.logger.warn(
-                isMobile,
-                'SEARCH-BING-IMAGE',
-                `Daily image search failed | message=${error instanceof Error ? error.message : String(error)}`
-            )
-        } finally {
-            await fs.promises.unlink(tempFilePath).catch(() => {})
-        }
     }
 
     private async randomScroll(page: Page, isMobile: boolean) {
