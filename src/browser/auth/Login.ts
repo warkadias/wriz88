@@ -591,7 +591,7 @@ export class Login {
         this.bot.logger.info(this.bot.isMobile, 'LOGIN-BING', 'Verifying Bing session')
 
         try {
-            await page.goto(url, { waitUntil: 'networkidle', timeout: 10000 }).catch(() => {})
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {})
 
             for (let i = 0; i < loopMax; i++) {
                 if (page.isClosed()) break
